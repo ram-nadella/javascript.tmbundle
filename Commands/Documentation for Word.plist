@@ -5,18 +5,42 @@
 	<key>beforeRunningCommand</key>
 	<string>nop</string>
 	<key>command</key>
-	<string>#!/usr/bin/env bash
-[[ -f "${TM_SUPPORT_PATH}/lib/bash_init.sh" ]] &amp;&amp; . "${TM_SUPPORT_PATH}/lib/bash_init.sh"
+	<string>#!/usr/bin/env ruby
 
-# JavaScript keyword and function index created from MDN documentation reference
-# https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference
+SUPPORT = ENV['TM_SUPPORT_PATH']
 
-ref=$(zgrep -w "${TM_SELECTED_TEXT:-$TM_CURRENT_WORD}" "$TM_BUNDLE_SUPPORT/mdn-reference.gz"|cut -d ' ' -f2)
+require SUPPORT + '/lib/ui'
+require SUPPORT + '/lib/exit_codes'
 
-[[ -n "$ref" ]] &amp;&amp; exit_show_html "&lt;meta http-equiv='Refresh' content='0;URL=http://developer.mozilla.org/en-US/docs$ref'&gt;"
+target_word = ENV["TM_SELECTED_TEXT"] ? ENV["TM_SELECTED_TEXT"] : ENV["TM_CURRENT_WORD"]
 
+# open a new window that will show MDN content
+def show_documentation_window(doc_path)
+  url = "http://developer.mozilla.org/en-US/docs#{doc_path}"
+  markup = "&lt;meta http-equiv='Refresh' content='0;URL=#{url}'&gt;"
+  TextMate.exit_show_html markup
+end
 
-echo "No documentation found."</string>
+# extract matches based on keyword
+matches = `zgrep -w "${TM_SELECTED_TEXT:-$TM_CURRENT_WORD}\s" "$TM_BUNDLE_SUPPORT/mdn-reference.gz"`.split("\n")
+
+if matches.length == 0
+   TextMate::UI.tool_tip "No documentation for &lt;b&gt;#{target_word}&lt;/b&gt;", :format =&gt; :html
+   exit
+elsif matches.length == 1
+   doc_path = matches[0].split(" ")[1]
+   show_documentation_window doc_path
+else
+  # more than one match, present options as menu
+  options = matches.map { |line| line.split(" ")[0] }
+  selection = TextMate::UI.menu(options)
+  unless selection == nil
+    doc_path = matches[selection].split(" ")[1]
+    show_documentation_window doc_path
+  end
+end
+
+</string>
 	<key>fallbackInput</key>
 	<string>word</string>
 	<key>input</key>
